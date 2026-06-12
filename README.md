@@ -100,5 +100,6 @@ curl -sL https://raw.githubusercontent.com/dakeeper/smartboxx/main/install.sh | 
 
 | Version | Datum | Änderungen |
 |---------|-------|-----------|
+| 1.2 | 12.06.2026 | Update-Prüfung, Installation, Master-Marker |
 | 1.1 | 12.06.2026 | Alle Backups anzeigen, Fortschrittsbalken, Strg+C Fix |
 | 1.0 | - | Initialversion |
