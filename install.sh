@@ -4,42 +4,72 @@
 
 set -e
 REPO="https://github.com/dakeeper/smartboxx"
+USER_HOME="$HOME"
 
 echo "SMARTBOXX Installation"
 echo "======================"
 echo ""
 
 # Prüfe ob bereits installiert
-if [ -f ~/.local/bin/smartboxx.py ]; then
+if [ -f "$USER_HOME/.local/bin/smartboxx.py" ]; then
     echo "SMARTBOXX ist bereits installiert."
     echo "Updates werden automatisch über das Programm geprüft."
     exit 0
 fi
 
 # Verzeichnisse anlegen
-mkdir -p ~/.local/bin
-mkdir -p ~/SMARTBOXX-TOOLS
-mkdir -p ~/mariadb-backups
+mkdir -p "$USER_HOME/.local/bin"
+mkdir -p "$USER_HOME/SMARTBOXX-TOOLS"
+mkdir -p "$USER_HOME/mariadb-backups"
 
 # Dateien herunterladen
 echo "Lade SMARTBOXX herunter..."
-curl -sL "$REPO/releases/latest/download/smartboxx.py" -o ~/.local/bin/smartboxx.py
-curl -sL "$REPO/releases/latest/download/sql-import" -o ~/SMARTBOXX-TOOLS/sql-import
-chmod +x ~/.local/bin/smartboxx.py ~/SMARTBOXX-TOOLS/sql-import
+curl -sL "$REPO/releases/latest/download/smartboxx.py" \
+  -o "$USER_HOME/.local/bin/smartboxx.py"
+curl -sL "$REPO/releases/latest/download/sql-import" \
+  -o "$USER_HOME/SMARTBOXX-TOOLS/sql-import"
+chmod +x "$USER_HOME/.local/bin/smartboxx.py"
+chmod +x "$USER_HOME/SMARTBOXX-TOOLS/sql-import"
+
+# Abhängigkeiten installieren
+echo "Installiere Abhängigkeiten..."
+sudo apt update
+sudo apt install -y python3-tk python3-pip mariadb-client pv 2>/dev/null
 
 # Autostart
-mkdir -p ~/.config/autostart
-cat > ~/.config/autostart/smartboxx.desktop << EOF
+echo "Richte Autostart ein..."
+mkdir -p "$USER_HOME/.config/autostart"
+cat > "$USER_HOME/.config/autostart/smartboxx.desktop" << EOF
 [Desktop Entry]
 Type=Application
 Name=SMARTBOXX
-Exec=python3 ~/.local/bin/smartboxx.py
+Exec=python3 $USER_HOME/.local/bin/smartboxx.py
 Terminal=false
 EOF
 
+# Desktop-Verknüpfung
+cat > "$USER_HOME/Desktop/SMARTBOXX.desktop" << EOF
+[Desktop Entry]
+Type=Application
+Name=SMARTBOXX
+Exec=python3 $USER_HOME/.local/bin/smartboxx.py
+Terminal=false
+EOF
+chmod +x "$USER_HOME/Desktop/SMARTBOXX.desktop"
+
 # sudoers für reboot/shutdown
-echo "dakeeper ALL=(ALL) NOPASSWD: /sbin/shutdown, /sbin/reboot" | sudo tee /etc/sudoers.d/010_smartboxx
+echo "Setze sudo-Rechte (shutdown/reboot)..."
+echo "$USER ALL=(ALL) NOPASSWD: /sbin/shutdown, /sbin/reboot" \
+  | sudo tee /etc/sudoers.d/010_smartboxx > /dev/null
 
 echo ""
-echo "Installation abgeschlossen!"
-echo "Starte SMARTBOXX mit: python3 ~/.local/bin/smartboxx.py"
+echo "╔═══════════════════════════════════════╗"
+echo "║  Installation abgeschlossen!          ║"
+echo "║                                       ║"
+echo "║  Starte SMARTBOXX mit:                ║"
+echo "║    python3 ~/.local/bin/smartboxx.py  ║"
+echo "║                                       ║"
+echo "║  Oder: Pi neustarten →                ║"
+echo "║    sudo reboot                        ║"
+echo "╚═══════════════════════════════════════╝"
+echo ""
