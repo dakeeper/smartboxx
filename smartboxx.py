@@ -60,14 +60,6 @@ class ShowIP:
             bg="#1a1a2e",
         )
         self.boot_label.pack(side=tk.LEFT, padx=3)
-        self.update_label = tk.Label(
-            self.header,
-            text="",
-            font=("Helvetica", 9, "bold"),
-            fg="#00cc66",
-            bg="#1a1a2e",
-        )
-        self.update_label.pack(side=tk.LEFT, padx=3)
         self.srcn_label = tk.Label(
             self.header,
             text="",
@@ -310,7 +302,7 @@ class ShowIP:
         if self.boot_count > 0 and self.boot_count % 25 == 0:
             self.root.after(2000, self.show_boot_reminder)
         if not IS_MASTER:
-            self.root.after(5000, self.check_update)
+            self.root.after(1000, self.check_update)
 # Coded by Holger Palloks - Support @ holger.palloks@gut-gruppe.de
 
     def show_credentials(self):
@@ -1152,39 +1144,85 @@ class ShowIP:
             data = json.loads(resp.read())
             latest = data["tag_name"].lstrip("v")
             if latest > LOCAL_VER:
-                self.update_label.config(
-                    text=f"[Update v{latest}]",
-                    fg="#00cc66"
-                )
-                self.update_label.bind("<Button>", lambda e: self.do_update(data["zipball_url"]))
-            else:
-                self.update_label.config(text="")
+                self.show_update_dialog(latest, data["zipball_url"])
         except:
             pass
         self.root.after(3600000, self.check_update)
 
-    def do_update(self, url):
-        import zipfile, io, tempfile
+    def show_update_dialog(self, version, url):
+        top = tk.Toplevel(self.root, bg="#e94560")
+        top.attributes("-fullscreen", True)
+        top.attributes("-topmost", True)
+        tk.Label(
+            top,
+            text=f"Update v{version} verfügbar!",
+            font=("Helvetica", 20, "bold"),
+            fg="white", bg="#e94560",
+        ).pack(expand=True)
+        tk.Label(
+            top,
+            text="Jetzt herunterladen und installieren?",
+            font=("Helvetica", 14),
+            fg="white", bg="#e94560",
+        ).pack()
+        btn_frame = tk.Frame(top, bg="#e94560")
+        btn_frame.pack(pady=30)
+        tk.Button(
+            btn_frame, text="UPDATE",
+            command=lambda: self.do_update(top, version, url),
+            bg="#00cc66", fg="white",
+            font=("Helvetica", 18, "bold"), width=10, bd=0
+        ).pack(side=tk.LEFT, padx=15)
+        tk.Button(
+            btn_frame, text="NEIN",
+            command=top.destroy,
+            bg="#0f3460", fg="white",
+            font=("Helvetica", 18, "bold"), width=10, bd=0
+        ).pack(side=tk.LEFT, padx=15)
+
+    def do_update(self, top, version, url):
+        top.destroy()
+        dlg = tk.Toplevel(self.root, bg="#1a1a2e")
+        dlg.attributes("-fullscreen", True)
+        dlg.attributes("-topmost", True)
+        tk.Label(
+            dlg,
+            text=f"Downloade v{version}...",
+            font=("Helvetica", 18, "bold"),
+            fg="#ffc107", bg="#1a1a2e",
+        ).pack(expand=True)
+        dlg.update()
+        import zipfile, io, tempfile, glob
         try:
-            self.update_label.config(text="Downloade...", fg="#ffc107")
             req = urllib.request.Request(url, headers={"User-Agent": "SMARTBOXX"})
             resp = urllib.request.urlopen(req, timeout=60)
             z = zipfile.ZipFile(io.BytesIO(resp.read()))
             tmp = tempfile.mkdtemp()
             z.extractall(tmp)
-            import glob
             extracted = glob.glob(os.path.join(tmp, "*/smartboxx.py"))
             if extracted:
                 shutil.copy2(extracted[0], os.path.expanduser("~/.local/bin/smartboxx.py"))
-                self.update_label.config(text="Neustart...", fg="#00cc66")
-                self.root.after(1000, lambda: subprocess.run(["sudo", "reboot"], check=False))
+                tk.Label(
+                    dlg, text="Neustart...",
+                    font=("Helvetica", 18, "bold"),
+                    fg="#00cc66", bg="#1a1a2e",
+                ).pack(expand=True)
+                dlg.update()
+                self.root.after(2000, lambda: subprocess.run(["sudo", "reboot"], check=False))
             else:
-                self.update_label.config(text="Fehler", fg="#e94560")
+                tk.Label(
+                    dlg, text="Fehler: Datei nicht gefunden",
+                    font=("Helvetica", 18, "bold"),
+                    fg="#e94560", bg="#1a1a2e",
+                ).pack(expand=True)
         except:
-            self.update_label.config(text="Fehler", fg="#e94560")
+            tk.Label(
+                dlg, text="Fehler beim Download",
+                font=("Helvetica", 18, "bold"),
+                fg="#e94560", bg="#1a1a2e",
+            ).pack(expand=True)
         finally:
             if tmp:
-                import shutil
                 shutil.rmtree(tmp, ignore_errors=True)
 
     def reboot(self):
