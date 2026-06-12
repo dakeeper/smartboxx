@@ -14,7 +14,7 @@ import re
 # Tue es, oder tue es nicht. Es gibt kein Versuchen.
 
 LOCAL_VER = "1.1"
-IS_MASTER = (socket.gethostname() == "SMARTBOXX-Pi4M")
+IS_MASTER = os.path.exists(os.path.expanduser("~/.smartboxx_master"))
 GITHUB_USER = "dakeeper"
 GITHUB_REPO = "smartboxx"
 UPDATE_CHECK_URL = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/releases/latest"
