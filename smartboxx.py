@@ -1193,6 +1193,7 @@ class ShowIP:
         ).pack(expand=True)
         dlg.update()
         import zipfile, io, tempfile, glob
+        tmp = None
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "SMARTBOXX"})
             resp = urllib.request.urlopen(req, timeout=60)
@@ -1200,8 +1201,14 @@ class ShowIP:
             tmp = tempfile.mkdtemp()
             z.extractall(tmp)
             extracted = glob.glob(os.path.join(tmp, "*/smartboxx.py"))
+            extracted_sql = glob.glob(os.path.join(tmp, "*/sql-import"))
             if extracted:
                 shutil.copy2(extracted[0], os.path.expanduser("~/.local/bin/smartboxx.py"))
+                os.chmod(os.path.expanduser("~/.local/bin/smartboxx.py"), 0o755)
+            if extracted_sql:
+                shutil.copy2(extracted_sql[0], os.path.expanduser("~/SMARTBOXX-TOOLS/sql-import"))
+                os.chmod(os.path.expanduser("~/SMARTBOXX-TOOLS/sql-import"), 0o755)
+            if extracted:
                 tk.Label(
                     dlg, text="Neustart...",
                     font=("Helvetica", 18, "bold"),
