@@ -1,5 +1,7 @@
 # SMARTBOXX
 
+[GitHub](https://github.com/dakeeper/smartboxx)
+
 System-Monitor & Verwaltung für Raspberry Pi mit 3.5" Touchscreen.
 
 ## Versionen
@@ -17,7 +19,7 @@ Nur hier werden Änderungen entwickelt und per Git pushed.
 ## Client-Installation
 
 ```bash
-curl -sL https://raw.githubusercontent.com/deinuser/smartboxx/main/install.sh | bash
+curl -sL https://raw.githubusercontent.com/dakeeper/smartboxx/main/install.sh | bash
 ```
 
 Clients prüfen automatisch jede Stunde auf neue Releases.

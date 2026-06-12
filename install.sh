@@ -3,7 +3,7 @@
 # Führt Update-Check und Erstinstallation durch
 
 set -e
-REPO="https://github.com/deinuser/smartboxx"
+REPO="https://github.com/dakeeper/smartboxx"
 
 echo "SMARTBOXX Installation"
 echo "======================"

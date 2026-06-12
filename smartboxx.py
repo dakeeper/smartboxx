@@ -15,7 +15,7 @@ import re
 
 LOCAL_VER = "1.1"
 IS_MASTER = (socket.gethostname() == "SMARTBOXX-Pi4M")
-GITHUB_USER = "deinuser"  # ← HIER DEINEN GITHUB-USER EINTRAGEN
+GITHUB_USER = "dakeeper"
 GITHUB_REPO = "smartboxx"
 UPDATE_CHECK_URL = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/releases/latest"
 
