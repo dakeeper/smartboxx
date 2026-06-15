@@ -583,6 +583,23 @@ do_restore_db() {
     [ $choice -eq 255 ] && return
     local target_db="${dbs_in_file[$choice]}"
 
+    # Prüfen ob DB bereits existiert
+    local db_exists=0
+    mariadb -u "$DB_USER" -p"$DB_PASS" -NBe "SELECT 1 FROM information_schema.schemata WHERE schema_name='$target_db'" 2>/dev/null | grep -q 1 && db_exists=1
+
+    if [ $db_exists -eq 1 ]; then
+        echo ""
+        echo -e "  ${YELLOW}Datenbank ${CYAN}$target_db${NC}${YELLOW} existiert bereits.${NC}"
+        echo -e "  ${YELLOW}Überschreiben? (DB wird gelöscht und neu angelegt)${NC}"
+        if ! confirm_dialog; then
+            echo -e "\n  ${YELLOW}Abgebrochen.${NC}"
+            echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+            read -r; return
+        fi
+        echo -e "  ${YELLOW}Lösche alte Datenbank ${CYAN}$target_db${NC}${YELLOW} ...${NC}"
+        mariadb -u "$DB_USER" -p"$DB_PASS" -e "DROP DATABASE IF EXISTS \`$target_db\`;" 2>/dev/null
+    fi
+
     echo ""
     echo -e "  ${RED}${BOLD}⚠ ACHTUNG: Datenbank ${CYAN}$target_db${NC}${RED}${BOLD} wird ERSETZT!${NC}"
     echo ""
@@ -685,6 +702,23 @@ do_restore_table() {
     choice=$?
     [ $choice -eq 255 ] && return
     local target_tbl="${tables_in_file[$choice]}"
+
+    # Prüfen ob Tabelle bereits existiert
+    local tbl_exists=0
+    mariadb -u "$DB_USER" -p"$DB_PASS" -NBe "SELECT 1 FROM information_schema.tables WHERE table_schema='$target_db' AND table_name='$target_tbl'" 2>/dev/null | grep -q 1 && tbl_exists=1
+
+    if [ $tbl_exists -eq 1 ]; then
+        echo ""
+        echo -e "  ${YELLOW}Tabelle ${CYAN}$target_db.$target_tbl${NC}${YELLOW} existiert bereits.${NC}"
+        echo -e "  ${YELLOW}Überschreiben? (Tabelle wird gelöscht und neu angelegt)${NC}"
+        if ! confirm_dialog; then
+            echo -e "\n  ${YELLOW}Abgebrochen.${NC}"
+            echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+            read -r; return
+        fi
+        echo -e "  ${YELLOW}Lösche alte Tabelle ${CYAN}$target_tbl${NC}${YELLOW} ...${NC}"
+        mariadb -u "$DB_USER" -p"$DB_PASS" -e "DROP TABLE IF EXISTS \`$target_db\`.\`$target_tbl\`;" 2>/dev/null
+    fi
 
     echo ""
     echo -e "  ${RED}${BOLD}⚠ Tabelle ${CYAN}$target_db.$target_tbl${NC}${RED}${BOLD} wird ERSETZT!${NC}"
