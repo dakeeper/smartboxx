@@ -571,11 +571,27 @@ do_restore_db() {
         [ -n "$dbname" ] && dbs_in_file+=("$dbname")
     done < <(grep -a "^-- Current Database:" "$SQL_FILE" 2>/dev/null)
 
+    # Fallback: USE-Statements parsen
     if [ ${#dbs_in_file[@]} -eq 0 ]; then
-        echo -e "  ${RED}✗ Keine Datenbank-Marker in der Datei gefunden.${NC}"
-        echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
-        read -r
-        return
+        while IFS= read -r line; do
+            local dbname
+            dbname=$(echo "$line" | sed -n 's/^USE[[:space:]]*`\([^`]*\)`.*/\1/p')
+            [ -z "$dbname" ] && dbname=$(echo "$line" | sed -n 's/^USE[[:space:]]*\([^;[:space:]]*\).*/\1/p')
+            [ -n "$dbname" ] && dbs_in_file+=("$dbname")
+        done < <(grep -a "^USE " "$SQL_FILE" 2>/dev/null)
+    fi
+
+    if [ ${#dbs_in_file[@]} -eq 0 ]; then
+        echo -e "  ${YELLOW}Keine Datenbank-Marker in der Datei. Bitte Namen eingeben:${NC}"
+        echo ""
+        read -p "  Datenbankname: " manual_db
+        if [ -n "$manual_db" ]; then
+            dbs_in_file+=("$manual_db")
+        else
+            echo -e "  ${RED}✗ Keine Datenbank angegeben.${NC}"
+            echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+            read -r; return
+        fi
     fi
 
     menu_select "Datenbank aus Backup auswählen:" "${dbs_in_file[@]}"
@@ -674,10 +690,27 @@ do_restore_table() {
         [ -n "$dbname" ] && dbs_in_file+=("$dbname")
     done < <(grep -a "^-- Current Database:" "$SQL_FILE" 2>/dev/null)
 
+    # Fallback: USE-Statements parsen
     if [ ${#dbs_in_file[@]} -eq 0 ]; then
-        echo -e "  ${RED}✗ Keine Datenbank-Marker in der Datei.${NC}"
-        echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
-        read -r; return
+        while IFS= read -r line; do
+            local dbname
+            dbname=$(echo "$line" | sed -n 's/^USE[[:space:]]*`\([^`]*\)`.*/\1/p')
+            [ -z "$dbname" ] && dbname=$(echo "$line" | sed -n 's/^USE[[:space:]]*\([^;[:space:]]*\).*/\1/p')
+            [ -n "$dbname" ] && dbs_in_file+=("$dbname")
+        done < <(grep -a "^USE " "$SQL_FILE" 2>/dev/null)
+    fi
+
+    if [ ${#dbs_in_file[@]} -eq 0 ]; then
+        echo -e "  ${YELLOW}Keine Datenbank-Marker in der Datei. Bitte Namen eingeben:${NC}"
+        echo ""
+        read -p "  Datenbankname: " manual_db
+        if [ -n "$manual_db" ]; then
+            dbs_in_file+=("$manual_db")
+        else
+            echo -e "  ${RED}✗ Keine Datenbank angegeben.${NC}"
+            echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+            read -r; return
+        fi
     fi
 
     menu_select "Datenbank aus Backup:" "${dbs_in_file[@]}"
