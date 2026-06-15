@@ -722,17 +722,17 @@ class ShowIP:
             except Exception:
                 uptime_str = ""
             self.ss_brand.config(text="SMARTBOXX")
-            self.ss_info.config(text=f"UPTIME: {uptime_str}")
+            self.ss_info.config(text=f"System uptime {uptime_str}")
             self.ss_after_id = self.root.after(15000, lambda: self.ss_cycle("hide", "show_cpu"))
         elif phase == "show_cpu":
             temp = self.get_cpu_temp()
             self.ss_brand.config(text="SMARTBOXX")
-            self.ss_info.config(text=temp)
+            self.ss_info.config(text=f"CPU Temp {temp}")
             self.ss_after_id = self.root.after(15000, lambda: self.ss_cycle("hide", "show_date"))
         elif phase == "hide":
             self.ss_brand.config(text="")
             self.ss_info.config(text="")
-            self.ss_after_id = self.root.after(30000, self.ss_cycle, next_phase)
+            self.ss_after_id = self.root.after(15000, self.ss_cycle, next_phase)
         else:
             self.ss_brand.config(text="")
             self.ss_info.config(text="")

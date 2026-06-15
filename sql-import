@@ -289,16 +289,16 @@ do_import() {
         START_TIME=$(date +%s)
         if [ -z "$DB_NAME" ]; then
             if command -v pv &>/dev/null; then
-                pv -p "$SQL_FILE" | mariadb -u "$DB_USER" -p"$DB_PASS"
+                pv -p "$SQL_FILE" | mariadb --force -u "$DB_USER" -p"$DB_PASS"
             else
-                mariadb -u "$DB_USER" -p"$DB_PASS" < "$SQL_FILE"
+                mariadb --force -u "$DB_USER" -p"$DB_PASS" < "$SQL_FILE"
             fi
         else
             mariadb -u "$DB_USER" -p"$DB_PASS" -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;" 2>/dev/null
             if command -v pv &>/dev/null; then
-                pv -p "$SQL_FILE" | mariadb -u "$DB_USER" -p"$DB_PASS" "$DB_NAME"
+                pv -p "$SQL_FILE" | mariadb --force -u "$DB_USER" -p"$DB_PASS" "$DB_NAME"
             else
-                mariadb -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$SQL_FILE"
+                mariadb --force -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$SQL_FILE"
             fi
         fi
 
@@ -369,9 +369,9 @@ do_backup() {
         echo -e "  ${YELLOW}Backup ALLER Datenbanken läuft... Strg+C = Abbruch${NC}"
         START_TIME=$(date +%s)
         if command -v pv &>/dev/null; then
-            mariadb-dump -u "$DB_USER" -p"$DB_PASS" --databases $(echo "$DBS" | tr '\n' ' ') | pv -p -s "$EST_SIZE" > "$BACKUP_FILE"
+            mariadb-dump -u "$DB_USER" -p"$DB_PASS" --hex-blob --databases $(echo "$DBS" | tr '\n' ' ') | pv -p -s "$EST_SIZE" > "$BACKUP_FILE"
         else
-            mariadb-dump -u "$DB_USER" -p"$DB_PASS" --databases $(echo "$DBS" | tr '\n' ' ') > "$BACKUP_FILE"
+            mariadb-dump -u "$DB_USER" -p"$DB_PASS" --hex-blob --databases $(echo "$DBS" | tr '\n' ' ') > "$BACKUP_FILE"
         fi
     else
         local DB_SELECTED="${db_list[$choice]}"
@@ -384,9 +384,9 @@ do_backup() {
         echo -e "  ${YELLOW}Backup von ${CYAN}$DB_SELECTED${NC} ${YELLOW}läuft... Strg+C = Abbruch${NC}"
         START_TIME=$(date +%s)
         if command -v pv &>/dev/null; then
-            mariadb-dump -u "$DB_USER" -p"$DB_PASS" --databases "$DB_SELECTED" | pv -p -s "$EST_SIZE" > "$BACKUP_FILE"
+            mariadb-dump -u "$DB_USER" -p"$DB_PASS" --hex-blob --databases "$DB_SELECTED" | pv -p -s "$EST_SIZE" > "$BACKUP_FILE"
         else
-            mariadb-dump -u "$DB_USER" -p"$DB_PASS" --databases "$DB_SELECTED" > "$BACKUP_FILE"
+            mariadb-dump -u "$DB_USER" -p"$DB_PASS" --hex-blob --databases "$DB_SELECTED" > "$BACKUP_FILE"
         fi
     fi
 
@@ -454,9 +454,9 @@ do_restore() {
         echo ""
         START_TIME=$(date +%s)
         if command -v pv &>/dev/null; then
-            pv -p "$SQL_FILE" | mariadb -u "$DB_USER" -p"$DB_PASS"
+            pv -p "$SQL_FILE" | mariadb --force -u "$DB_USER" -p"$DB_PASS"
         else
-            mariadb -u "$DB_USER" -p"$DB_PASS" < "$SQL_FILE"
+            mariadb --force -u "$DB_USER" -p"$DB_PASS" < "$SQL_FILE"
         fi
         END_TIME=$(date +%s)
         DURATION=$((END_TIME - START_TIME))
