@@ -13,7 +13,7 @@ import re
 # Coded by Holger Palloks - Support @ holger.palloks@gut-gruppe.de
 # Tue es, oder tue es nicht. Es gibt kein Versuchen.
 
-LOCAL_VER = "1.31"
+LOCAL_VER = "1.32"
 IS_MASTER = os.path.exists(os.path.expanduser("~/.smartboxx_master"))
 GITHUB_USER = "dakeeper"
 GITHUB_REPO = "smartboxx"
@@ -83,7 +83,7 @@ class ShowIP:
 
         self.title = tk.Label(
             self.frame,
-            text="SMARTBOXX V1.31",
+            text="SMARTBOXX V1.32",
             font=("Helvetica", 18, "bold"),
             fg="#00cc66",
             bg="#1a1a2e",

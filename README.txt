@@ -1,4 +1,4 @@
-SMARTBOXX V1.31 - Display-Programm
+SMARTBOXX V1.32 - Display-Programm
 ===================================
 
   GitHub:       https://github.com/dakeeper/smartboxx
@@ -166,6 +166,24 @@ MariaDB Optimierung
 
 Changelog
 ---------
+  1.32 (15.06.2026)
+    - [NEU] Modernes Menü-Design (Doppellinien-Rahmen, Nummern-Kurztasten 1-9)
+    - [NEU] DB-Erstellungsabfrage bei Tabellen-Restore (fehlende DB wird angelegt)
+    - [FIX] DB-Marker-Suche liest nur erste 1MB (von 16ms statt 5,5s)
+    - [FIX] Header-Box korrekt ausgerichtet (44 Zeichen)
+    - [FIX] Fortschrittsanzeige bei Extraktion aus großen Backups
+
+  1.31 (15.06.2026)
+    - [NEU] 2-stufiges Menü im SQL-Tool (Backup/Wiederherstellen/Verwalten/Tools)
+    - [FIX] Verify-Zeilen zählt multi-line INSERTs korrekt
+    - [FIX] Table-Restore bei Dumps ohne DB-Marker (in_db=1 Fallback)
+    - [FIX] stderr unterdrückt (2>/dev/null), EST_SIZE ×2 für pv
+
+  1.30 (15.06.2026)
+    - [NEU] MariaDB-Konfiguration optimiert (innodb_buffer_pool_size=2G u.a.)
+    - [NEU] Screensaver 6-Phasen-Zyklus mit Single-Tick-Loop
+    - [FIX] GDBus PolicyKit-Fehler (lxpolkit auf /bin/true umgeleitet)
+
   1.0 (Initialversion)
     - System-Monitor mit IP, CPU, RAM, HD, Diensten
     - SQL-Import/Backup/Restore-Tool
