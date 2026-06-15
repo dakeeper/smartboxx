@@ -1,4 +1,4 @@
-SMARTBOXX V1.3 - Display-Programm
+SMARTBOXX V1.31 - Display-Programm
 ===================================
 
   GitHub:       https://github.com/dakeeper/smartboxx
