@@ -1,4 +1,4 @@
-SMARTBOXX V1.32 - Display-Programm
+SMARTBOXX V1.40 - Display-Programm
 ===================================
 
   GitHub:       https://github.com/dakeeper/smartboxx
@@ -166,6 +166,12 @@ MariaDB Optimierung
 
 Changelog
 ---------
+  1.40 (15.06.2026)
+    - [NEU] ROTATE-Button im Exit-Dialog (180°-Bildschirmrotation)
+    - [NEU] Touch-Kalibrierung inkludiert (Umschalten per NOPASSWD)
+    - [FIX] sudo-Passwort-Cache: NOPASSWD für cat/cp/bash/sync/sed
+    - [FIX] Zuverlässige Rotation via Python-IO (kein grep/sed mehr)
+
   1.32 (15.06.2026)
     - [NEU] Modernes Menü-Design (Doppellinien-Rahmen, Nummern-Kurztasten 1-9)
     - [NEU] DB-Erstellungsabfrage bei Tabellen-Restore (fehlende DB wird angelegt)

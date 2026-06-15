@@ -13,7 +13,7 @@ import re
 # Coded by Holger Palloks - Support @ holger.palloks@gut-gruppe.de
 # Tue es, oder tue es nicht. Es gibt kein Versuchen.
 
-LOCAL_VER = "1.32"
+LOCAL_VER = "1.40"
 IS_MASTER = os.path.exists(os.path.expanduser("~/.smartboxx_master"))
 GITHUB_USER = "dakeeper"
 GITHUB_REPO = "smartboxx"
@@ -83,7 +83,7 @@ class ShowIP:
 
         self.title = tk.Label(
             self.frame,
-            text="SMARTBOXX V1.32",
+            text="SMARTBOXX V1.40",
             font=("Helvetica", 18, "bold"),
             fg="#00cc66",
             bg="#1a1a2e",
@@ -652,6 +652,12 @@ class ShowIP:
             font=("Helvetica", 15, "bold"), width=10, bd=0
         ).pack(side=tk.LEFT, padx=10)
         tk.Button(
+            btn_frame, text="ROTATE",
+            command=lambda: self._toggle_rotation(top),
+            bg="#533483", fg="white",
+            font=("Helvetica", 15, "bold"), width=10, bd=0
+        ).pack(side=tk.LEFT, padx=10)
+        tk.Button(
             btn_frame, text="CLOSE",
             command=lambda: self._do_exit_close(top),
             bg="#0f3460", fg="white",
@@ -667,6 +673,65 @@ class ShowIP:
     def _do_exit_close(self, top):
         top.destroy()
         self.root.destroy()
+
+    def _toggle_rotation(self, top):
+        top.destroy()
+        cfg = "/boot/firmware/config.txt"
+        try:
+            r = subprocess.run(
+                ["sudo", "cat", cfg], capture_output=True, text=True, timeout=5
+            )
+            m = re.search(r'(dtoverlay=\S+:rotate=)(\d+)', r.stdout)
+            if not m:
+                self.show_info("Fehler: Rotation nicht gefunden")
+                return
+            current = int(m.group(2))
+            new = 270 if current == 90 else 90
+            new_content = r.stdout.replace(
+                f"rotate={current}", f"rotate={new}"
+            )
+            subprocess.run(
+                ["sudo", "bash", "-c", f"cat > {cfg}"],
+                input=new_content, text=True, timeout=5
+            )
+            subprocess.run([
+                "sudo", "cp",
+                f"/home/dakeeper/LCD-show/usr/99-calibration.conf-35-{new}",
+                "/etc/X11/xorg.conf.d/99-calibration.conf"
+            ], timeout=5, check=True)
+            subprocess.run(["sudo", "sync"], timeout=5)
+        except Exception:
+            self.show_info("Fehler beim Ändern der Rotation")
+            return
+        self._rotation_reboot_dialog()
+
+    def _rotation_reboot_dialog(self):
+        top = tk.Toplevel(self.root)
+        top.attributes("-fullscreen", True)
+        top.configure(bg="#1a1a2e")
+        top.config(cursor="none")
+        tk.Label(top, text="Rotation geändert!",
+                 font=("Helvetica", 16, "bold"), fg="white",
+                 bg="#1a1a2e").pack(pady=30)
+        tk.Label(top, text="Neustart erforderlich.\nJetzt neustarten?",
+                 font=("Helvetica", 14), fg="white",
+                 bg="#1a1a2e", justify=tk.CENTER).pack(pady=10)
+        btn_frame = tk.Frame(top, bg="#1a1a2e")
+        btn_frame.pack(pady=20)
+
+        def do_reboot():
+            top.destroy()
+            self.root.destroy()
+            subprocess.run(["sudo", "reboot"], check=False)
+
+        tk.Button(btn_frame, text="Yes", command=do_reboot,
+                  bg="#e94560", fg="white",
+                  font=("Helvetica", 15, "bold"), width=10, bd=0
+                  ).pack(side=tk.LEFT, padx=10)
+        tk.Button(btn_frame, text="No", command=top.destroy,
+                  bg="#0f3460", fg="white",
+                  font=("Helvetica", 15, "bold"), width=10, bd=0
+                  ).pack(side=tk.LEFT, padx=10)
 
     def start_screensaver(self):
         if self.ss_active:
