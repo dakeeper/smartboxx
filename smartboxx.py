@@ -669,7 +669,8 @@ class ShowIP:
         self.root.destroy()
 
     def start_screensaver(self):
-        # Lernen wir müssen, loszulassen, was wir fürchten zu verlieren.
+        if self.ss_active:
+            return
         self.ss_active = True
         self.ss_top = tk.Toplevel(self.root)
         self.ss_top.attributes("-fullscreen", True)
@@ -689,10 +690,11 @@ class ShowIP:
             fg="#00cc66", bg="black",
         )
         self.ss_info.place(relx=0.5, rely=0.6, anchor=tk.CENTER)
-        self.ss_cycle("show_date")
+        self.ss_phase = 0
+        self.ss_timer = 0
+        self._ss_tick()
 
     def stop_screensaver(self):
-        # Aus der Furcht entspringt der Zorn, aus dem Zorn die Gewalt und aus der Gewalt der Schmerz
         if self.ss_after_id:
             self.root.after_cancel(self.ss_after_id)
             self.ss_after_id = None
@@ -704,39 +706,65 @@ class ShowIP:
             self.ss_brand = None
             self.ss_info = None
 
-    def ss_cycle(self, phase, next_phase=None):
+    def _ss_tick(self):
         if not self.ss_active:
             return
-        if phase == "show_date":
-            now = datetime.datetime.now().strftime("%d.%m.%Y  %H:%M")
-            self.ss_brand.config(text="SMARTBOXX")
-            self.ss_info.config(text=now)
-            self.ss_after_id = self.root.after(15000, lambda: self.ss_cycle("hide", "show_uptime"))
-        elif phase == "show_uptime":
-            try:
-                with open("/proc/uptime") as f:
-                    seconds = float(f.read().split()[0])
-                hours = int(seconds // 3600)
-                minutes = int((seconds % 3600) // 60)
-                uptime_str = f"{hours:02d}:{minutes:02d}"
-            except Exception:
-                uptime_str = ""
-            self.ss_brand.config(text="SMARTBOXX")
-            self.ss_info.config(text=f"System uptime {uptime_str}")
-            self.ss_after_id = self.root.after(15000, lambda: self.ss_cycle("hide", "show_cpu"))
-        elif phase == "show_cpu":
-            temp = self.get_cpu_temp()
-            self.ss_brand.config(text="SMARTBOXX")
-            self.ss_info.config(text=f"CPU Temp {temp}")
-            self.ss_after_id = self.root.after(15000, lambda: self.ss_cycle("hide", "show_date"))
-        elif phase == "hide":
-            self.ss_brand.config(text="")
-            self.ss_info.config(text="")
-            self.ss_after_id = self.root.after(15000, self.ss_cycle, next_phase)
-        else:
-            self.ss_brand.config(text="")
-            self.ss_info.config(text="")
-            self.ss_after_id = self.root.after(1000, self.ss_cycle, "show_date")
+        try:
+            if self.ss_phase == 0:
+                now = datetime.datetime.now().strftime("%d.%m.%Y  %H:%M")
+                self.ss_brand.config(text="SMARTBOXX")
+                self.ss_info.config(text=now)
+                self.ss_timer += 1
+                if self.ss_timer >= 15:
+                    self.ss_phase = 1
+                    self.ss_timer = 0
+                    self.ss_brand.config(text="")
+                    self.ss_info.config(text="")
+            elif self.ss_phase == 1:
+                self.ss_timer += 1
+                if self.ss_timer >= 15:
+                    self.ss_phase = 2
+                    self.ss_timer = 0
+                    try:
+                        with open("/proc/uptime") as f:
+                            s = float(f.read().split()[0])
+                        h = int(s // 3600)
+                        m = int((s % 3600) // 60)
+                        u = f"{h:02d}:{m:02d}"
+                    except Exception:
+                        u = ""
+                    self.ss_brand.config(text="SMARTBOXX")
+                    self.ss_info.config(text=f"System uptime {u}")
+            elif self.ss_phase == 2:
+                self.ss_timer += 1
+                if self.ss_timer >= 15:
+                    self.ss_phase = 3
+                    self.ss_timer = 0
+                    self.ss_brand.config(text="")
+                    self.ss_info.config(text="")
+            elif self.ss_phase == 3:
+                self.ss_timer += 1
+                if self.ss_timer >= 15:
+                    self.ss_phase = 4
+                    self.ss_timer = 0
+                    t = self.get_cpu_temp()
+                    self.ss_brand.config(text="SMARTBOXX")
+                    self.ss_info.config(text=f"CPU Temp {t}")
+            elif self.ss_phase == 4:
+                self.ss_timer += 1
+                if self.ss_timer >= 15:
+                    self.ss_phase = 5
+                    self.ss_timer = 0
+                    self.ss_brand.config(text="")
+                    self.ss_info.config(text="")
+            elif self.ss_phase == 5:
+                self.ss_timer += 1
+                if self.ss_timer >= 15:
+                    self.ss_phase = 0
+                    self.ss_timer = 0
+        except Exception:
+            pass
+        self.ss_after_id = self.root.after(1000, self._ss_tick)
 
     def fetch_ip(self):
         # Aus der Furcht entspringt der Zorn, aus dem Zorn die Gewalt und aus der Gewalt der Schmerz
