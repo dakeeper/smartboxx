@@ -473,7 +473,8 @@ class ShowIP:
         services = [("MariaDB", "mariadb"),
                     ("Apache", "apache2"),
                     ("SSH", "ssh"),
-                    ("Samba", "smbd")]
+                    ("Samba", "smbd"),
+                    ("Falcon", "falcon-sensor")]
         for label, svc in services:
             row = tk.Frame(self.svc_frame, bg="#1a1a2e")
             row.pack(fill=tk.X, padx=5, pady=2)
@@ -488,6 +489,9 @@ class ShowIP:
             tk.Label(row, text=display,
                      font=("Helvetica", 10), fg=color,
                      bg="#1a1a2e").pack(side=tk.LEFT)
+
+            if svc == "falcon-sensor":
+                continue
 
             start_cmd = lambda s=svc: self.toggle_service("start", s)
             stop_cmd = lambda s=svc: self.toggle_service("stop", s)
