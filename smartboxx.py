@@ -389,6 +389,17 @@ class ShowIP:
         except Exception:
             return ""
 
+    def get_last_unattended_upgrade(self):
+        try:
+            log = "/var/log/unattended-upgrades/unattended-upgrades.log"
+            with open(log) as f:
+                for line in f:
+                    pass
+                last = line.split(",")[0].strip()
+                return last
+        except Exception:
+            return "?"
+
     def toggle_service(self, action, svc_name):
         top = tk.Toplevel(self.root)
         top.attributes("-fullscreen", True)
@@ -453,11 +464,14 @@ class ShowIP:
                  bg="#1a1a2e").pack()
         tk.Label(self.svc_frame, text=f"Kernel: {kernel}",
                  font=("Helvetica", 9), fg="#888",
+                 bg="#1a1a2e").pack(pady=(0, 2))
+        last_upgrade = self.get_last_unattended_upgrade()
+        tk.Label(self.svc_frame, text=f"Letztes unattended-upgrade: {last_upgrade}",
+                 font=("Helvetica", 9), fg="#888",
                  bg="#1a1a2e").pack(pady=(0, 5))
 
         services = [("MariaDB", "mariadb"),
                     ("Apache", "apache2"),
-                    ("FTP", "vsftpd"),
                     ("SSH", "ssh"),
                     ("Samba", "smbd")]
         for label, svc in services:
