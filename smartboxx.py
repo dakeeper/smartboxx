@@ -1147,7 +1147,7 @@ class ShowIP:
                 self.show_update_dialog(latest, data["zipball_url"])
         except:
             pass
-        self.root.after(3600000, self.check_update)
+        self.root.after(432000000, self.check_update)
 
     def show_update_dialog(self, version, url):
         top = tk.Toplevel(self.root, bg="#e94560")
