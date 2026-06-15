@@ -99,28 +99,32 @@ DB - Datenbank-Zugangsdaten
     (IP-Adresse steht auf dem Hauptbildschirm unter Loc-IP)
 
 SMARTBOXX SQL-TOOL (sql-import)
---------------------------------
+-------------------------------
   Terminal-Befehl:  ~/SMARTBOXX-TOOLS/sql-import
 
-   Menü mit 6 Optionen:
-     1 - SQL-Datei importieren
-         Datei-Browser mit Pfeiltasten (↑↓) navigieren,
-         .sql-Datei auswählen, ESC zurück
-     2 - Datenbank-Backup erstellen (einzeln oder alle)
-         Mit geschätzter Größe aus information_schema
-     3 - Backup wiederherstellen
-         ⚠ Achtung: Alle aktuellen Daten werden ersetzt!
-         Bestätigung durch Eingabe von "JA" erforderlich
-     4 - Import verifizieren
-         Vergleicht Zeilenanzahl pro Tabelle zwischen SQL-Datei
-         und importierter Datenbank (erkennt Abweichungen)
-     5 - Alle Backups anzeigen
-         Listet alle .sql-Dateien mit Größe + Datum,
-         ↑↓ blättern (10 pro Seite), ESC zurück
-     6 - Beenden
+  Zweistufiges Menü (ESC = eine Ebene zurück):
+
+  ─── Hauptmenü ───
+    • Backup erstellen
+      → DB Komplettbackup (alle)  (mariadb-dump)
+      → Einzelne DB exportieren
+      → Einzelne Tabelle exportieren
+    • Wiederherstellen
+      → DB Backup wiederherstellen  (komplettes Backup)
+      → Einzelne DB wiederherstellen
+      → Einzelne Tabelle wiederherstellen
+    • DB / Tabelle verwalten
+      → Datenbank löschen
+      → Tabelle löschen
+      → DB duplizieren
+      → Tabelle duplizieren
+    • Tools
+      → SQL-Datei importieren  (Datei-Browser mit Pfeiltasten)
+      → Import verifizieren  (Zeilenvergleich Datei ↔ DB)
+      → Alle Backups anzeigen  (Liste mit ↑↓ blättern)
 
   Zugangsdaten: root / root
-  Backup-Ordner: ~/mariadb-backups/ (Anzahl wird im Menü angezeigt)
+  Backup-Ordner: ~/mariadb-backups/ (wird im Menü angezeigt)
   Fortschrittsanzeige: pv mit echten Balken + Prozent
 
   Das Skript liegt in ~/SMARTBOXX-TOOLS/sql-import

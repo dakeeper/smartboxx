@@ -257,6 +257,60 @@ confirm_dialog() {
     done
 }
 
+select_database() {
+    local exclude_system="$1"
+    local filter=""
+    [ "$exclude_system" = "1" ] && filter="mysql|information_schema|performance_schema|sys"
+    local dbs
+    if [ -n "$filter" ]; then
+        dbs=$(mariadb -u "$DB_USER" -p"$DB_PASS" -N -e "SHOW DATABASES;" 2>/dev/null | grep -v -E "^($filter)$" || true)
+    else
+        dbs=$(mariadb -u "$DB_USER" -p"$DB_PASS" -N -e "SHOW DATABASES;" 2>/dev/null || true)
+    fi
+
+    if [ -z "$dbs" ]; then
+        echo -e "  ${RED}✗ Keine Datenbanken gefunden.${NC}"
+        return 1
+    fi
+
+    local db_list=()
+    while IFS= read -r db; do
+        db_list+=("$db")
+    done <<< "$dbs"
+
+    menu_select "Datenbank auswählen:" "${db_list[@]}"
+    local choice=$?
+    [ $choice -eq 255 ] && return 1
+
+    SELECTED_DB="${db_list[$choice]}"
+    return 0
+}
+
+select_table() {
+    local db="$1"
+    local tables
+    tables=$(mariadb -u "$DB_USER" -p"$DB_PASS" -N -e "SHOW TABLES FROM \`$db\`;" 2>/dev/null || true)
+
+    if [ -z "$tables" ]; then
+        echo -e "  ${RED}✗ Keine Tabellen in ${CYAN}$db${NC} gefunden.${NC}"
+        return 1
+    fi
+
+    local tbl_list=()
+    while IFS= read -r tbl; do
+        tbl_list+=("$tbl")
+    done <<< "$tables"
+
+    menu_select "Tabelle in ${CYAN}$db${NC} auswählen:" "${tbl_list[@]}"
+    local choice=$?
+    [ $choice -eq 255 ] && return 1
+
+    SELECTED_TABLE="${tbl_list[$choice]}"
+    return 0
+}
+
+# ─────────── BACKUP ───────────
+
 do_import() {
     print_header
     echo -e "${BOLD}${BLUE}  SQL-Datei importieren${NC}"
@@ -321,17 +375,8 @@ do_import() {
     read -r
 }
 
-do_backup() {
-    print_header
-    echo -e "${BOLD}${YELLOW}  Datenbank-Backup erstellen${NC}"
-    echo "  ─────────────────────────────"
-    echo ""
-
-    TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
-    BACKUP_FILE="$BACKUP_DIR/mariadb-backup-$TIMESTAMP.sql"
-    echo -e "  Ziel: ${CYAN}$BACKUP_FILE${NC}"
-    echo ""
-
+do_backup_all() {
+    local DBS
     DBS=$(mariadb -u "$DB_USER" -p"$DB_PASS" -N -e "SHOW DATABASES;" 2>/dev/null | grep -v -E "^(information_schema|performance_schema|sys)$" || true)
 
     if [ -z "$DBS" ]; then
@@ -340,56 +385,22 @@ do_backup() {
         read -r; return
     fi
 
-    echo -e "  ${GREEN}✓ Gefundene Datenbanken:${NC}"
-    while IFS= read -r db; do
-        echo -e "    • ${CYAN}$db${NC}"
-    done <<< "$DBS"
-    echo ""
+    local EST_SIZE
+    EST_SIZE=$(mariadb -u "$DB_USER" -p"$DB_PASS" -NBe \
+        "SELECT SUM(data_length + index_length) FROM information_schema.tables WHERE table_schema NOT IN ('mysql','information_schema','performance_schema','sys')" 2>/dev/null || echo 0)
+    [ -z "$EST_SIZE" ] && EST_SIZE=0
+    EST_SIZE=$((EST_SIZE * 2))
 
-    local db_list=()
-    while IFS= read -r db; do
-        db_list+=("$db")
-    done <<< "$DBS"
-    db_list+=("ALLE")
+    TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
+    BACKUP_FILE="$BACKUP_DIR/mariadb-backup-alle-$TIMESTAMP.sql"
 
-    menu_select "Datenbank auswählen:" "${db_list[@]}"
-    local choice=$?
-
-    if [ $choice -eq 255 ]; then
-        return
-    fi
-
+    echo -e "  ${YELLOW}Backup ALLER Datenbanken läuft... Strg+C = Abbruch${NC}"
+    START_TIME=$(date +%s)
     ABORT_FLAG=0
-    if [ $choice -eq $((${#db_list[@]} - 1)) ]; then
-        local EST_SIZE
-        EST_SIZE=$(mariadb -u "$DB_USER" -p"$DB_PASS" -NBe \
-            "SELECT SUM(data_length + index_length) FROM information_schema.tables WHERE table_schema NOT IN ('mysql','information_schema','performance_schema','sys')" 2>/dev/null || echo 0)
-        [ -z "$EST_SIZE" ] && EST_SIZE=0
-        EST_SIZE=$((EST_SIZE * 2))
-        echo ""
-        echo -e "  ${YELLOW}Backup ALLER Datenbanken läuft... Strg+C = Abbruch${NC}"
-        START_TIME=$(date +%s)
-        if command -v pv &>/dev/null; then
-            mariadb-dump -u "$DB_USER" -p"$DB_PASS" --hex-blob --databases $(echo "$DBS" | tr '\n' ' ') | pv -p -s "$EST_SIZE" > "$BACKUP_FILE"
-        else
-            mariadb-dump -u "$DB_USER" -p"$DB_PASS" --hex-blob --databases $(echo "$DBS" | tr '\n' ' ') > "$BACKUP_FILE"
-        fi
+    if command -v pv &>/dev/null; then
+        mariadb-dump -u "$DB_USER" -p"$DB_PASS" --hex-blob --databases $(echo "$DBS" | tr '\n' ' ') | pv -p -s "$EST_SIZE" > "$BACKUP_FILE"
     else
-        local DB_SELECTED="${db_list[$choice]}"
-        local EST_SIZE
-        EST_SIZE=$(mariadb -u "$DB_USER" -p"$DB_PASS" -NBe \
-            "SELECT SUM(data_length + index_length) FROM information_schema.tables WHERE table_schema='$DB_SELECTED'" 2>/dev/null || echo 0)
-        [ -z "$EST_SIZE" ] && EST_SIZE=0
-        EST_SIZE=$((EST_SIZE * 2))
-        BACKUP_FILE="$BACKUP_DIR/mariadb-backup-${DB_SELECTED}-$TIMESTAMP.sql"
-        echo ""
-        echo -e "  ${YELLOW}Backup von ${CYAN}$DB_SELECTED${NC} ${YELLOW}läuft... Strg+C = Abbruch${NC}"
-        START_TIME=$(date +%s)
-        if command -v pv &>/dev/null; then
-            mariadb-dump -u "$DB_USER" -p"$DB_PASS" --hex-blob --databases "$DB_SELECTED" | pv -p -s "$EST_SIZE" > "$BACKUP_FILE"
-        else
-            mariadb-dump -u "$DB_USER" -p"$DB_PASS" --hex-blob --databases "$DB_SELECTED" > "$BACKUP_FILE"
-        fi
+        mariadb-dump -u "$DB_USER" -p"$DB_PASS" --hex-blob --databases $(echo "$DBS" | tr '\n' ' ') > "$BACKUP_FILE"
     fi
 
     END_TIME=$(date +%s)
@@ -399,30 +410,87 @@ do_backup() {
     if [ $ABORT_FLAG -eq 1 ]; then
         echo -e "  ${YELLOW}${BOLD}⚠ Backup abgebrochen${NC}"
         ABORT_FLAG=0
-        echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
-        read -r
         return
     fi
-
     echo -e "  ${GREEN}${BOLD}✓ Backup erstellt!${NC}"
     echo -e "  ${CYAN}  Datei:${NC} $BACKUP_FILE"
     echo -e "  ${CYAN}  Größe:${NC} $RESULT_SIZE"
     echo -e "  ${CYAN}  Dauer:${NC} $(printf '%02d:%02d' $((DURATION / 60)) $((DURATION % 60)))"
-    echo ""
-    echo -e "  ${YELLOW}Alte Backups ( >30 Tage) löschen?${NC}"
-
-    if confirm_dialog; then
-        find "$BACKUP_DIR" -name "mariadb-backup-*.sql" -mtime +30 -delete 2>/dev/null
-        echo -e "  ${GREEN}✓ Alte Backups gelöscht${NC}"
-    fi
-
-    echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
-    read -r
 }
 
-do_restore() {
+do_backup_db() {
+    if ! select_database 1; then
+        echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+        read -r; return
+    fi
+    local db="$SELECTED_DB"
+
+    local EST_SIZE
+    EST_SIZE=$(mariadb -u "$DB_USER" -p"$DB_PASS" -NBe \
+        "SELECT SUM(data_length + index_length) FROM information_schema.tables WHERE table_schema='$db'" 2>/dev/null || echo 0)
+    [ -z "$EST_SIZE" ] && EST_SIZE=0
+    EST_SIZE=$((EST_SIZE * 2))
+
+    TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
+    BACKUP_FILE="$BACKUP_DIR/mariadb-backup-${db}-$TIMESTAMP.sql"
+
+    echo -e "  ${YELLOW}Backup von ${CYAN}$db${NC} ${YELLOW}läuft... Strg+C = Abbruch${NC}"
+    START_TIME=$(date +%s)
+    ABORT_FLAG=0
+    if command -v pv &>/dev/null; then
+        mariadb-dump -u "$DB_USER" -p"$DB_PASS" --hex-blob --databases "$db" | pv -p -s "$EST_SIZE" > "$BACKUP_FILE"
+    else
+        mariadb-dump -u "$DB_USER" -p"$DB_PASS" --hex-blob --databases "$db" > "$BACKUP_FILE"
+    fi
+
+    END_TIME=$(date +%s)
+    DURATION=$((END_TIME - START_TIME))
+    RESULT_SIZE=$(numfmt --to=iec --format="%.1f" "$(stat -c%s "$BACKUP_FILE")" 2>/dev/null || echo "?")
+    echo ""
+    if [ $ABORT_FLAG -eq 1 ]; then
+        echo -e "  ${YELLOW}${BOLD}⚠ Backup abgebrochen${NC}"
+        ABORT_FLAG=0
+        return
+    fi
+    echo -e "  ${GREEN}${BOLD}✓ Backup erstellt!${NC}"
+    echo -e "  ${CYAN}  Datei:${NC} $BACKUP_FILE"
+    echo -e "  ${CYAN}  Größe:${NC} $RESULT_SIZE"
+    echo -e "  ${CYAN}  Dauer:${NC} $(printf '%02d:%02d' $((DURATION / 60)) $((DURATION % 60)))"
+}
+
+do_export_table() {
+    if ! select_database 1; then
+        echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+        read -r; return
+    fi
+    local db="$SELECTED_DB"
+
+    if ! select_table "$db"; then
+        echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+        read -r; return
+    fi
+    local tbl="$SELECTED_TABLE"
+
+    TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
+    BACKUP_FILE="$BACKUP_DIR/${db}-${tbl}-$TIMESTAMP.sql"
+
+    echo -e "  ${YELLOW}Exportiere ${CYAN}$db.$tbl${NC} ${YELLOW}...${NC}"
+    START_TIME=$(date +%s)
+    mariadb-dump -u "$DB_USER" -p"$DB_PASS" --hex-blob "$db" "$tbl" > "$BACKUP_FILE"
+    END_TIME=$(date +%s)
+    DURATION=$((END_TIME - START_TIME))
+    RESULT_SIZE=$(numfmt --to=iec --format="%.1f" "$(stat -c%s "$BACKUP_FILE")" 2>/dev/null || echo "?")
+    echo -e "  ${GREEN}${BOLD}✓ Exportiert!${NC}"
+    echo -e "  ${CYAN}  Datei:${NC} $BACKUP_FILE"
+    echo -e "  ${CYAN}  Größe:${NC} $RESULT_SIZE"
+    echo -e "  ${CYAN}  Dauer:${NC} $(printf '%02d:%02d' $((DURATION / 60)) $((DURATION % 60)))"
+}
+
+# ─────────── RESTORE ───────────
+
+do_restore_backup() {
     print_header
-    echo -e "${BOLD}${RED}  Backup wiederherstellen${NC}"
+    echo -e "${BOLD}${RED}  DB Backup wiederherstellen${NC}"
     echo "  ─────────────────────────────"
     echo ""
     echo -e "  ${YELLOW}ESC = zurück, Enter = auswählen${NC}"
@@ -435,7 +503,7 @@ do_restore() {
     fi
 
     print_header
-    echo -e "${BOLD}${RED}  Backup wiederherstellen${NC}"
+    echo -e "${BOLD}${RED}  DB Backup wiederherstellen${NC}"
     echo "  ─────────────────────────────"
     echo ""
     echo -e "  ${RED}${BOLD}╔══════════════════════════════════════════════╗${NC}"
@@ -470,13 +538,336 @@ do_restore() {
             echo -e "  ${GREEN}${BOLD}✓ Wiederherstellung abgeschlossen!${NC}"
             echo -e "  ${CYAN}  Dauer:${NC} $(printf '%02d:%02d' $((DURATION / 60)) $((DURATION % 60)))"
         fi
-    else
-        echo -e "\n  ${YELLOW}Wiederherstellung abgebrochen.${NC}"
     fi
-
     echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
     read -r
 }
+
+do_restore_db() {
+    print_header
+    echo -e "${BOLD}${RED}  Einzelne DB wiederherstellen${NC}"
+    echo "  ─────────────────────────────"
+    echo ""
+    echo -e "  ${YELLOW}ESC = zurück, Enter = Backup-Datei wählen${NC}"
+    echo ""
+    echo -e "  ${CYAN}Drücke Enter...${NC}"
+    read -r
+
+    if ! file_browser "$BACKUP_DIR"; then
+        return
+    fi
+
+    print_header
+    echo -e "${BOLD}${RED}  Einzelne DB wiederherstellen${NC}"
+    echo "  ─────────────────────────────"
+    echo ""
+    echo -e "  ${CYAN}Datei:${NC} $SQL_FILE"
+    echo ""
+
+    local dbs_in_file=()
+    while IFS= read -r line; do
+        local dbname
+        dbname=$(echo "$line" | sed -n 's/.*Current Database: `\([^`]*\)`.*/\1/p')
+        [ -n "$dbname" ] && dbs_in_file+=("$dbname")
+    done < <(grep -a "^-- Current Database:" "$SQL_FILE" 2>/dev/null)
+
+    if [ ${#dbs_in_file[@]} -eq 0 ]; then
+        echo -e "  ${RED}✗ Keine Datenbank-Marker in der Datei gefunden.${NC}"
+        echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+        read -r
+        return
+    fi
+
+    menu_select "Datenbank aus Backup auswählen:" "${dbs_in_file[@]}"
+    local choice=$?
+    [ $choice -eq 255 ] && return
+    local target_db="${dbs_in_file[$choice]}"
+
+    echo ""
+    echo -e "  ${RED}${BOLD}⚠ ACHTUNG: Datenbank ${CYAN}$target_db${NC}${RED}${BOLD} wird ERSETZT!${NC}"
+    echo ""
+    echo -e "  ${YELLOW}Wirklich wiederherstellen?${NC}"
+
+    ABORT_FLAG=0
+    if confirm_dialog; then
+        print_header
+        echo -e "  ${YELLOW}Stelle ${CYAN}$target_db${NC}${YELLOW} wieder her... Strg+C = Abbruch${NC}"
+        echo ""
+        START_TIME=$(date +%s)
+        local found=0
+        local tmpfile
+        tmpfile=$(mktemp)
+        # Extract the section for the selected database
+        awk -v db="$target_db" '
+            /^-- Current Database:/ {
+                if (found) exit
+                if (index($0, "`" db "`")) found=1
+                next
+            }
+            found { print }
+        ' "$SQL_FILE" > "$tmpfile"
+        if [ -s "$tmpfile" ]; then
+            if command -v pv &>/dev/null; then
+                pv -p "$tmpfile" | mariadb --force -u "$DB_USER" -p"$DB_PASS" 2>/dev/null
+            else
+                mariadb --force -u "$DB_USER" -p"$DB_PASS" < "$tmpfile" 2>/dev/null
+            fi
+        else
+            echo -e "  ${RED}✗ Keine Daten für ${CYAN}$target_db${NC} in der Datei.${NC}"
+        fi
+        rm -f "$tmpfile"
+        END_TIME=$(date +%s)
+        DURATION=$((END_TIME - START_TIME))
+        echo ""
+        if [ $ABORT_FLAG -eq 1 ]; then
+            echo -e "  ${YELLOW}${BOLD}⚠ Wiederherstellung abgebrochen${NC}"
+            ABORT_FLAG=0
+        else
+            echo -e "  ${GREEN}${BOLD}✓ Wiederherstellung abgeschlossen!${NC}"
+            echo -e "  ${CYAN}  Dauer:${NC} $(printf '%02d:%02d' $((DURATION / 60)) $((DURATION % 60)))"
+        fi
+    fi
+    echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+    read -r
+}
+
+do_restore_table() {
+    print_header
+    echo -e "${BOLD}${RED}  Einzelne Tabelle wiederherstellen${NC}"
+    echo "  ─────────────────────────────"
+    echo ""
+    echo -e "  ${YELLOW}ESC = zurück, Enter = Backup-Datei wählen${NC}"
+    echo ""
+    echo -e "  ${CYAN}Drücke Enter...${NC}"
+    read -r
+
+    if ! file_browser "$BACKUP_DIR"; then
+        return
+    fi
+
+    print_header
+    echo -e "${BOLD}${RED}  Einzelne Tabelle wiederherstellen${NC}"
+    echo "  ─────────────────────────────"
+    echo ""
+
+    local dbs_in_file=()
+    while IFS= read -r line; do
+        local dbname
+        dbname=$(echo "$line" | sed -n 's/.*Current Database: `\([^`]*\)`.*/\1/p')
+        [ -n "$dbname" ] && dbs_in_file+=("$dbname")
+    done < <(grep -a "^-- Current Database:" "$SQL_FILE" 2>/dev/null)
+
+    if [ ${#dbs_in_file[@]} -eq 0 ]; then
+        echo -e "  ${RED}✗ Keine Datenbank-Marker in der Datei.${NC}"
+        echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+        read -r; return
+    fi
+
+    menu_select "Datenbank aus Backup:" "${dbs_in_file[@]}"
+    local choice=$?
+    [ $choice -eq 255 ] && return
+    local target_db="${dbs_in_file[$choice]}"
+
+    local tables_in_file=()
+    while IFS= read -r line; do
+        local tblname
+        tblname=$(echo "$line" | sed -n 's/.*Table structure for table `\([^`]*\)`.*/\1/p')
+        [ -n "$tblname" ] && tables_in_file+=("$tblname")
+    done < <(grep -a "^-- Table structure for table" "$SQL_FILE" 2>/dev/null)
+
+    if [ ${#tables_in_file[@]} -eq 0 ]; then
+        echo -e "  ${RED}✗ Keine Tabellen in der Datei.${NC}"
+        echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+        read -r; return
+    fi
+
+    menu_select "Tabelle aus Backup:" "${tables_in_file[@]}"
+    choice=$?
+    [ $choice -eq 255 ] && return
+    local target_tbl="${tables_in_file[$choice]}"
+
+    echo ""
+    echo -e "  ${RED}${BOLD}⚠ Tabelle ${CYAN}$target_db.$target_tbl${NC}${RED}${BOLD} wird ERSETZT!${NC}"
+    echo ""
+    echo -e "  ${YELLOW}Wirklich wiederherstellen?${NC}"
+
+    ABORT_FLAG=0
+    if confirm_dialog; then
+        print_header
+        echo -e "  ${YELLOW}Stelle ${CYAN}$target_tbl${NC}${YELLOW} wieder her... Strg+C = Abbruch${NC}"
+        echo ""
+        START_TIME=$(date +%s)
+        local tmpfile
+        tmpfile=$(mktemp)
+        awk -v db="$target_db" -v tbl="$target_tbl" '
+            /^-- Current Database:/ { in_db = (index($0, "`" db "`") > 0); next }
+            /^-- Table structure for table/ { in_tbl = (index($0, "`" tbl "`") > 0 && in_db); next }
+            in_tbl && /^-- Dumping data for table/ { print; next }
+            in_tbl && /^-- Table structure for table/ { in_tbl = 0 }
+            in_db && in_tbl { print }
+        ' "$SQL_FILE" > "$tmpfile"
+        if [ -s "$tmpfile" ]; then
+            if command -v pv &>/dev/null; then
+                pv -p "$tmpfile" | mariadb --force -u "$DB_USER" -p"$DB_PASS" "$target_db" 2>/dev/null
+            else
+                mariadb --force -u "$DB_USER" -p"$DB_PASS" "$target_db" < "$tmpfile" 2>/dev/null
+            fi
+        else
+            echo -e "  ${RED}✗ Keine Daten für ${CYAN}$target_tbl${NC} in der Datei.${NC}"
+        fi
+        rm -f "$tmpfile"
+        END_TIME=$(date +%s)
+        DURATION=$((END_TIME - START_TIME))
+        echo ""
+        if [ $ABORT_FLAG -eq 1 ]; then
+            echo -e "  ${YELLOW}${BOLD}⚠ Wiederherstellung abgebrochen${NC}"
+            ABORT_FLAG=0
+        else
+            echo -e "  ${GREEN}${BOLD}✓ Wiederherstellung abgeschlossen!${NC}"
+            echo -e "  ${CYAN}  Dauer:${NC} $(printf '%02d:%02d' $((DURATION / 60)) $((DURATION % 60)))"
+        fi
+    fi
+    echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+    read -r
+}
+
+# ─────────── VERWALTEN ───────────
+
+do_drop_db() {
+    print_header
+    echo -e "${BOLD}${RED}  Datenbank löschen${NC}"
+    echo "  ─────────────────────────────"
+    echo ""
+
+    if ! select_database 1; then
+        echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+        read -r; return
+    fi
+    local db="$SELECTED_DB"
+
+    echo ""
+    echo -e "  ${RED}${BOLD}╔══════════════════════════════════════════════╗${NC}"
+    echo -e "  ${RED}${BOLD}║          ⚠  UNWIEDERBRINGLICH!  ⚠           ║${NC}"
+    echo -e "  ${RED}${BOLD}║  ${CYAN}$db${NC}${RED}${BOLD}  wird endgültig gelöscht!         ║${NC}"
+    echo -e "  ${RED}${BOLD}╚══════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "  ${YELLOW}Wirklich löschen?${NC}"
+
+    if confirm_dialog; then
+        mariadb -u "$DB_USER" -p"$DB_PASS" -e "DROP DATABASE \`$db\`;" 2>/dev/null
+        if [ $? -eq 0 ]; then
+            echo -e "  ${GREEN}${BOLD}✓ Datenbank ${CYAN}$db${NC}${GREEN} gelöscht.${NC}"
+        else
+            echo -e "  ${RED}✗ Fehler beim Löschen von ${CYAN}$db${NC}"
+        fi
+    fi
+    echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+    read -r
+}
+
+do_drop_table() {
+    print_header
+    echo -e "${BOLD}${RED}  Tabelle löschen${NC}"
+    echo "  ─────────────────────────────"
+    echo ""
+
+    if ! select_database 1; then
+        echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+        read -r; return
+    fi
+    local db="$SELECTED_DB"
+
+    if ! select_table "$db"; then
+        echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+        read -r; return
+    fi
+    local tbl="$SELECTED_TABLE"
+
+    echo ""
+    echo -e "  ${RED}${BOLD}╔══════════════════════════════════════════════╗${NC}"
+    echo -e "  ${RED}${BOLD}║          ⚠  UNWIEDERBRINGLICH!  ⚠           ║${NC}"
+    echo -e "  ${RED}${BOLD}║  ${CYAN}$db.$tbl${NC}${RED}${BOLD}  wird endgültig gelöscht!    ║${NC}"
+    echo -e "  ${RED}${BOLD}╚══════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "  ${YELLOW}Wirklich löschen?${NC}"
+
+    if confirm_dialog; then
+        mariadb -u "$DB_USER" -p"$DB_PASS" -e "DROP TABLE \`$db\`.\`$tbl\`;" 2>/dev/null
+        if [ $? -eq 0 ]; then
+            echo -e "  ${GREEN}${BOLD}✓ Tabelle ${CYAN}$db.$tbl${NC}${GREEN} gelöscht.${NC}"
+        else
+            echo -e "  ${RED}✗ Fehler beim Löschen von ${CYAN}$db.$tbl${NC}"
+        fi
+    fi
+    echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+    read -r
+}
+
+do_duplicate_db() {
+    print_header
+    echo -e "${BOLD}${BLUE}  DB duplizieren${NC}"
+    echo "  ─────────────────────────────"
+    echo ""
+
+    if ! select_database 1; then
+        echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+        read -r; return
+    fi
+    local src_db="$SELECTED_DB"
+
+    echo ""
+    read -p "  Name der neuen Datenbank: " new_db
+    [ -z "$new_db" ] && new_db="${src_db}_copy"
+
+    echo ""
+    echo -e "  ${YELLOW}Dupliziere ${CYAN}$src_db${NC}${YELLOW} → ${CYAN}$new_db${NC}${YELLOW} ...${NC}"
+    START_TIME=$(date +%s)
+    mariadb -u "$DB_USER" -p"$DB_PASS" -e "CREATE DATABASE IF NOT EXISTS \`$new_db\`;" 2>/dev/null
+    mariadb-dump -u "$DB_USER" -p"$DB_PASS" "$src_db" | mariadb -u "$DB_USER" -p"$DB_PASS" "$new_db" 2>/dev/null
+    END_TIME=$(date +%s)
+    DURATION=$((END_TIME - START_TIME))
+    echo -e "  ${GREEN}${BOLD}✓ ${CYAN}$src_db${NC}${GREEN} → ${CYAN}$new_db${NC}${GREEN} dupliziert!${NC}"
+    echo -e "  ${CYAN}  Dauer:${NC} $(printf '%02d:%02d' $((DURATION / 60)) $((DURATION % 60)))"
+    echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+    read -r
+}
+
+do_duplicate_table() {
+    print_header
+    echo -e "${BOLD}${BLUE}  Tabelle duplizieren${NC}"
+    echo "  ─────────────────────────────"
+    echo ""
+
+    if ! select_database 1; then
+        echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+        read -r; return
+    fi
+    local db="$SELECTED_DB"
+
+    if ! select_table "$db"; then
+        echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+        read -r; return
+    fi
+    local src_tbl="$SELECTED_TABLE"
+
+    echo ""
+    read -p "  Name der neuen Tabelle: " new_tbl
+    [ -z "$new_tbl" ] && new_tbl="${src_tbl}_copy"
+
+    echo ""
+    echo -e "  ${YELLOW}Dupliziere ${CYAN}$db.$src_tbl${NC}${YELLOW} → ${CYAN}$db.$new_tbl${NC}${YELLOW} ...${NC}"
+    start_time=$(date +%s)
+    mariadb -u "$DB_USER" -p"$DB_PASS" -e "CREATE TABLE \`$db\`.\`$new_tbl\` LIKE \`$db\`.\`$src_tbl\`;" 2>/dev/null
+    mariadb -u "$DB_USER" -p"$DB_PASS" -e "INSERT INTO \`$db\`.\`$new_tbl\` SELECT * FROM \`$db\`.\`$src_tbl\`;" 2>/dev/null
+    end_time=$(date +%s)
+    DURATION=$((end_time - start_time))
+    echo -e "  ${GREEN}${BOLD}✓ ${CYAN}$src_tbl${NC}${GREEN} → ${CYAN}$new_tbl${NC}${GREEN} dupliziert!${NC}"
+    echo -e "  ${CYAN}  Dauer:${NC} $(printf '%02d:%02d' $((DURATION / 60)) $((DURATION % 60)))"
+    echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+    read -r
+}
+
+# ─────────── TOOLS ───────────
 
 do_list_backups() {
     print_header
@@ -558,7 +949,6 @@ do_verify() {
     echo -e "  ${CYAN}Datei:${NC} $sql_file"
     echo ""
 
-    # Extract unique table names from CREATE TABLE statements
     local tables=()
     while IFS= read -r line; do
         local tname
@@ -569,11 +959,9 @@ do_verify() {
     if [ ${#tables[@]} -eq 0 ]; then
         echo -e "  ${RED}✗ Keine CREATE TABLE Statements in der Datei gefunden.${NC}"
         echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
-        read -r
-        return
+        read -r; return
     fi
 
-    # Identify database name from CREATE DATABASE or first USE statement
     local db_name=""
     db_name=$(grep -m1 -i "^CREATE DATABASE" "$sql_file" | sed -n 's/.*CREATE DATABASE.*`\([^`]*\)`.*/\1/p')
     [ -z "$db_name" ] && db_name=$(grep -m1 -i "^USE " "$sql_file" | sed -n 's/.*USE[[:space:]]*`\([^`]*\)`.*/\1/p')
@@ -589,7 +977,6 @@ do_verify() {
     local total_rows_db=0
 
     for tbl in "${tables[@]}"; do
-        # Count rows in SQL file (handles multi-row INSERT ... VALUES (...),(...),...)
         local rows_file=0
         while IFS= read -r line; do
             local cnt
@@ -597,10 +984,8 @@ do_verify() {
             rows_file=$((rows_file + cnt))
         done < <(grep -i "INSERT INTO.*\`$tbl\`" "$sql_file" 2>/dev/null)
 
-        # Fallback: count INSERT lines
         [ $rows_file -eq 0 ] && rows_file=$(grep -ic "INSERT INTO.*\`$tbl\`" "$sql_file" 2>/dev/null)
 
-        # Query actual row count from database
         local rows_db=0
         if [ -n "$db_name" ]; then
             rows_db=$(mariadb -u "$DB_USER" -p"$DB_PASS" -NBe "SELECT COUNT(*) FROM \`$db_name\`.\`$tbl\`" 2>/dev/null)
@@ -634,6 +1019,79 @@ do_verify() {
     read -r
 }
 
+# ─────────── SUB-MENÜS ───────────
+
+menu_backup() {
+    while true; do
+        menu_select "Backup erstellen" \
+            "DB Komplettbackup (alle)" \
+            "Einzelne DB exportieren" \
+            "Einzelne Tabelle exportieren"
+        local choice=$?
+        [ $choice -eq 255 ] && return
+        case $choice in
+            0) do_backup_all ;;
+            1) do_backup_db ;;
+            2) do_export_table ;;
+        esac
+        echo ""
+        echo -e "  ${YELLOW}Enter für Menü...${NC}"
+        read -r
+    done
+}
+
+menu_restore() {
+    while true; do
+        menu_select "Wiederherstellen" \
+            "DB Backup wiederherstellen" \
+            "Einzelne DB wiederherstellen" \
+            "Einzelne Tabelle wiederherstellen"
+        local choice=$?
+        [ $choice -eq 255 ] && return
+        case $choice in
+            0) do_restore_backup ;;
+            1) do_restore_db ;;
+            2) do_restore_table ;;
+        esac
+    done
+}
+
+menu_manage() {
+    while true; do
+        menu_select "DB / Tabelle verwalten" \
+            "Datenbank löschen" \
+            "Tabelle löschen" \
+            "DB duplizieren" \
+            "Tabelle duplizieren"
+        local choice=$?
+        [ $choice -eq 255 ] && return
+        case $choice in
+            0) do_drop_db ;;
+            1) do_drop_table ;;
+            2) do_duplicate_db ;;
+            3) do_duplicate_table ;;
+        esac
+    done
+}
+
+menu_tools() {
+    while true; do
+        menu_select "Tools" \
+            "SQL-Datei importieren" \
+            "Import verifizieren" \
+            "Alle Backups anzeigen"
+        local choice=$?
+        [ $choice -eq 255 ] && return
+        case $choice in
+            0) do_import ;;
+            1) do_verify ;;
+            2) do_list_backups ;;
+        esac
+    done
+}
+
+# ─────────── MAIN ───────────
+
 if ! command -v mariadb &>/dev/null && ! command -v mysql &>/dev/null; then
     echo -e "${RED}✗ MariaDB/mysql nicht gefunden.${NC}"
     exit 1
@@ -644,26 +1102,24 @@ while true; do
     print_info_bar
 
     menu_select "Hauptmenü" \
-        "SQL-Datei importieren" \
-        "Datenbank-Backup erstellen" \
-        "Backup wiederherstellen" \
-        "Import verifizieren" \
-        "Alle Backups anzeigen" \
+        "Backup erstellen" \
+        "Wiederherstellen" \
+        "DB / Tabelle verwalten" \
+        "Tools" \
         "Beenden"
 
     choice=$?
 
     if [ $choice -eq 255 ]; then
-        choice=5
+        choice=4
     fi
 
     case $choice in
-        0) do_import ;;
-        1) do_backup ;;
-        2) do_restore ;;
-        3) do_verify ;;
-        4) do_list_backups ;;
-        5)
+        0) menu_backup ;;
+        1) menu_restore ;;
+        2) menu_manage ;;
+        3) menu_tools ;;
+        4)
             print_header
             echo -e "  ${GREEN}Bis bald!${NC}"
             echo ""
