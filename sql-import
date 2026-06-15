@@ -767,10 +767,17 @@ do_restore_table() {
         local tmpfile
         tmpfile=$(mktemp)
         awk -v db="$target_db" -v tbl="$target_tbl" '
-            /^-- Current Database:/ { in_db = (index($0, "`" db "`") > 0); next }
-            /^-- Table structure for table/ { in_tbl = (index($0, "`" tbl "`") > 0 && in_db); next }
+            BEGIN { in_db = 1; db_found = 0 }
+            /^-- Current Database:/ {
+                if (index($0, "`" db "`")) { in_db = 1; db_found = 1 }
+                else if (db_found) in_db = 0
+                next
+            }
+            /^-- Table structure for table/ {
+                in_tbl = (index($0, "`" tbl "`") > 0)
+                if (in_tbl) next
+            }
             in_tbl && /^-- Dumping data for table/ { print; next }
-            in_tbl && /^-- Table structure for table/ { in_tbl = 0 }
             in_db && in_tbl { print }
         ' "$SQL_FILE" > "$tmpfile"
         if [ -s "$tmpfile" ]; then
@@ -1045,12 +1052,12 @@ do_verify() {
 
     for tbl in "${tables[@]}"; do
         local rows_file=0
-        while IFS= read -r line; do
-            local cnt
-            cnt=$(echo "$line" | awk -F"VALUES" 'NF>1{print $2}' | grep -o "(" | wc -l)
-            rows_file=$((rows_file + cnt))
-        done < <(grep -i "INSERT INTO.*\`$tbl\`" "$sql_file" 2>/dev/null)
-
+        # Extract INSERT block for this table and count value tuples
+        local insert_block
+        insert_block=$(sed -n "/INSERT INTO.*\`$tbl\`/,/;/p" "$sql_file" 2>/dev/null)
+        if [ -n "$insert_block" ]; then
+            rows_file=$(echo "$insert_block" | grep -o "(" | wc -l)
+        fi
         [ $rows_file -eq 0 ] && rows_file=$(grep -ic "INSERT INTO.*\`$tbl\`" "$sql_file" 2>/dev/null)
 
         local rows_db=0
