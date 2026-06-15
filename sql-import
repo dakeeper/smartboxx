@@ -534,6 +534,104 @@ do_list_backups() {
     read -r
 }
 
+do_verify() {
+    print_header
+    echo -e "${BOLD}${BLUE}  Import verifizieren${NC}"
+    echo "  ─────────────────────────────"
+    echo ""
+    echo -e "  ${YELLOW}ESC = zurück, Enter = Datei auswählen${NC}"
+    echo ""
+    echo -e "  ${CYAN}Drücke Enter...${NC}"
+    read -r
+
+    if ! file_browser "$BACKUP_DIR"; then
+        return
+    fi
+
+    local sql_file="$SQL_FILE"
+    print_header
+    echo -e "${BOLD}${BLUE}  Import verifizieren${NC}"
+    echo "  ─────────────────────────────"
+    echo ""
+    echo -e "  ${CYAN}Datei:${NC} $sql_file"
+    echo ""
+
+    # Extract unique table names from CREATE TABLE statements
+    local tables=()
+    while IFS= read -r line; do
+        local tname
+        tname=$(echo "$line" | sed -n 's/.*CREATE TABLE.*`\([^`]*\)`.*/\1/p')
+        [ -n "$tname" ] && tables+=("$tname")
+    done < <(grep -i "^CREATE TABLE" "$sql_file" 2>/dev/null)
+
+    if [ ${#tables[@]} -eq 0 ]; then
+        echo -e "  ${RED}✗ Keine CREATE TABLE Statements in der Datei gefunden.${NC}"
+        echo -e "\n  ${YELLOW}Enter für Menü...${NC}"
+        read -r
+        return
+    fi
+
+    # Identify database name from CREATE DATABASE or first USE statement
+    local db_name=""
+    db_name=$(grep -m1 -i "^CREATE DATABASE" "$sql_file" | sed -n 's/.*CREATE DATABASE.*`\([^`]*\)`.*/\1/p')
+    [ -z "$db_name" ] && db_name=$(grep -m1 -i "^USE " "$sql_file" | sed -n 's/.*USE[[:space:]]*`\([^`]*\)`.*/\1/p')
+    [ -z "$db_name" ] && db_name=$(grep -m1 -i "^USE " "$sql_file" | sed -n 's/.*USE[[:space:]]*\([^;[:space:]]*\).*/\1/p')
+
+    echo -e "  ${BOLD}Gefundene Tabellen:${NC} ${#tables[@]}"
+    [ -n "$db_name" ] && echo -e "  ${BOLD}Datenbank:${NC} ${CYAN}$db_name${NC}"
+    echo ""
+
+    local ok_count=0
+    local fail_count=0
+    local total_rows_file=0
+    local total_rows_db=0
+
+    for tbl in "${tables[@]}"; do
+        # Count rows in SQL file (handles multi-row INSERT ... VALUES (...),(...),...)
+        local rows_file=0
+        while IFS= read -r line; do
+            local cnt
+            cnt=$(echo "$line" | awk -F"VALUES" 'NF>1{print $2}' | grep -o "(" | wc -l)
+            rows_file=$((rows_file + cnt))
+        done < <(grep -i "INSERT INTO.*\`$tbl\`" "$sql_file" 2>/dev/null)
+
+        # Fallback: count INSERT lines
+        [ $rows_file -eq 0 ] && rows_file=$(grep -ic "INSERT INTO.*\`$tbl\`" "$sql_file" 2>/dev/null)
+
+        # Query actual row count from database
+        local rows_db=0
+        if [ -n "$db_name" ]; then
+            rows_db=$(mariadb -u "$DB_USER" -p"$DB_PASS" -NBe "SELECT COUNT(*) FROM \`$db_name\`.\`$tbl\`" 2>/dev/null)
+        else
+            rows_db=$(mariadb -u "$DB_USER" -p"$DB_PASS" -NBe "SELECT COUNT(*) FROM \`$tbl\`" 2>/dev/null)
+        fi
+        rows_db=${rows_db:-0}
+        rows_file=${rows_file:-0}
+        total_rows_file=$((total_rows_file + rows_file))
+        total_rows_db=$((total_rows_db + rows_db))
+
+        if [ "$rows_file" -eq "$rows_db" ]; then
+            echo -e "  ${GREEN}✓${NC} ${tbl}  ${CYAN}${rows_file}${NC} Zeilen (ok)"
+            ok_count=$((ok_count + 1))
+        else
+            echo -e "  ${RED}✗${NC} ${tbl}  Datei: ${YELLOW}${rows_file}${NC}  DB: ${YELLOW}${rows_db}${NC}  ${RED}MISMATCH${NC}"
+            fail_count=$((fail_count + 1))
+        fi
+    done
+
+    echo ""
+    echo "  ─────────────────────────────"
+    echo -e "  ${BOLD}Gesamt:${NC} Datei: ${CYAN}${total_rows_file}${NC} Zeilen  DB: ${CYAN}${total_rows_db}${NC} Zeilen"
+    if [ $fail_count -eq 0 ]; then
+        echo -e "  ${GREEN}${BOLD}✓ Alle ${ok_count} Tabellen verifiziert (keine Abweichungen)${NC}"
+    else
+        echo -e "  ${RED}${BOLD}✗ ${fail_count} Abweichung(en) gefunden${NC}"
+    fi
+    echo ""
+    echo -e "  ${YELLOW}Enter für Menü...${NC}"
+    read -r
+}
+
 if ! command -v mariadb &>/dev/null && ! command -v mysql &>/dev/null; then
     echo -e "${RED}✗ MariaDB/mysql nicht gefunden.${NC}"
     exit 1
@@ -547,21 +645,23 @@ while true; do
         "SQL-Datei importieren" \
         "Datenbank-Backup erstellen" \
         "Backup wiederherstellen" \
+        "Import verifizieren" \
         "Alle Backups anzeigen" \
         "Beenden"
 
     choice=$?
 
     if [ $choice -eq 255 ]; then
-        choice=4
+        choice=5
     fi
 
     case $choice in
         0) do_import ;;
         1) do_backup ;;
         2) do_restore ;;
-        3) do_list_backups ;;
-        4)
+        3) do_verify ;;
+        4) do_list_backups ;;
+        5)
             print_header
             echo -e "  ${GREEN}Bis bald!${NC}"
             echo ""
