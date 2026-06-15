@@ -365,6 +365,7 @@ do_backup() {
         EST_SIZE=$(mariadb -u "$DB_USER" -p"$DB_PASS" -NBe \
             "SELECT SUM(data_length + index_length) FROM information_schema.tables WHERE table_schema NOT IN ('mysql','information_schema','performance_schema','sys')" 2>/dev/null || echo 0)
         [ -z "$EST_SIZE" ] && EST_SIZE=0
+        EST_SIZE=$((EST_SIZE * 2))
         echo ""
         echo -e "  ${YELLOW}Backup ALLER Datenbanken läuft... Strg+C = Abbruch${NC}"
         START_TIME=$(date +%s)
@@ -379,6 +380,7 @@ do_backup() {
         EST_SIZE=$(mariadb -u "$DB_USER" -p"$DB_PASS" -NBe \
             "SELECT SUM(data_length + index_length) FROM information_schema.tables WHERE table_schema='$DB_SELECTED'" 2>/dev/null || echo 0)
         [ -z "$EST_SIZE" ] && EST_SIZE=0
+        EST_SIZE=$((EST_SIZE * 2))
         BACKUP_FILE="$BACKUP_DIR/mariadb-backup-${DB_SELECTED}-$TIMESTAMP.sql"
         echo ""
         echo -e "  ${YELLOW}Backup von ${CYAN}$DB_SELECTED${NC} ${YELLOW}läuft... Strg+C = Abbruch${NC}"
