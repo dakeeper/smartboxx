@@ -62,6 +62,11 @@ echo "Setze sudo-Rechte (shutdown/reboot)..."
 echo "$USER ALL=(ALL) NOPASSWD: /sbin/shutdown, /sbin/reboot" \
   | sudo tee /etc/sudoers.d/010_smartboxx > /dev/null
 
+# sudoers für Bildschirmrotation (ROTATE-Button)
+echo "Setze sudo-Rechte (rotate)..."
+echo "$USER ALL=(ALL) NOPASSWD: /bin/cat, /bin/cp, /bin/bash, /bin/sync, /bin/sed" \
+  | sudo tee /etc/sudoers.d/010_rotate > /dev/null
+
 echo ""
 echo "╔═══════════════════════════════════════╗"
 echo "║  Installation abgeschlossen!          ║"

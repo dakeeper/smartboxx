@@ -153,6 +153,24 @@ Screensaver
   Im Hauptbildschirm zeigt SRCN:MM:SS den Countdown bis zum
   Screensaver an (z.B. SRCN:09:59).
 
+Bildschirmrotation (ROTATE)
+----------------------------
+  Der ROTATE-Button im Exit-Dialog (CLOSE-Menü) dreht den Bildschirm
+  um 180°. Die Einstellung bleibt nach Neustart erhalten.
+
+  Voraussetzungen:
+    1. LCD-show installiert (MHS35-Overlay + Kalibrierungs-Dateien)
+    2. NOPASSWD für rotate-Kommandos (automatisch via install.sh):
+         /bin/cat, /bin/cp, /bin/bash, /bin/sync, /bin/sed
+
+  Ablauf:
+    • ROTATE im Exit-Dialog klicken
+    • Config wird umgeschaltet (90° ↔ 270°)
+    • Touch-Kalibrierung wird getauscht
+    • Neustart-Dialog → JA = sofort rebooten / NEIN = später
+
+  Ohne diese Voraussetzungen hängt das Programm (kein TTY für sudo).
+
 MariaDB Optimierung
 -------------------
   Config: /etc/mysql/mariadb.conf.d/50-server.cnf
