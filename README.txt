@@ -1,4 +1,4 @@
-SMARTBOXX V1.40 - Display-Programm
+SMARTBOXX V1.41 - Display-Programm
 ===================================
 
   GitHub:       https://github.com/dakeeper/smartboxx
@@ -184,6 +184,10 @@ MariaDB Optimierung
 
 Changelog
 ---------
+  1.41 (15.06.2026)
+    - [NEU] Screensaver: Slogan "..Database in your pocket!" nach jeder Info-Anzeige
+    - [NEU] Italic-Label (ss_slogan) für Marken-Slogan im Screensaver
+
   1.40 (15.06.2026)
     - [NEU] ROTATE-Button im Exit-Dialog (180°-Bildschirmrotation)
     - [NEU] Touch-Kalibrierung inkludiert (Umschalten per NOPASSWD)

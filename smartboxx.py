@@ -13,7 +13,7 @@ import re
 # Coded by Holger Palloks - Support @ holger.palloks@gut-gruppe.de
 # Tue es, oder tue es nicht. Es gibt kein Versuchen.
 
-LOCAL_VER = "1.40"
+LOCAL_VER = "1.41"
 IS_MASTER = os.path.exists(os.path.expanduser("~/.smartboxx_master"))
 GITHUB_USER = "dakeeper"
 GITHUB_REPO = "smartboxx"
@@ -83,7 +83,7 @@ class ShowIP:
 
         self.title = tk.Label(
             self.frame,
-            text="SMARTBOXX V1.40",
+            text="SMARTBOXX V1.41",
             font=("Helvetica", 18, "bold"),
             fg="#00cc66",
             bg="#1a1a2e",
@@ -749,6 +749,12 @@ class ShowIP:
             fg="#00cc66", bg="black",
         )
         self.ss_brand.place(relx=0.5, rely=0.4, anchor=tk.CENTER)
+        self.ss_slogan = tk.Label(
+            self.ss_top, text="",
+            font=("Helvetica", 28, "bold italic"),
+            fg="#00cc66", bg="black",
+        )
+        self.ss_slogan.place(relx=0.5, rely=0.6, anchor=tk.CENTER)
         self.ss_info = tk.Label(
             self.ss_top, text="",
             font=("Helvetica", 28, "bold"),
@@ -769,6 +775,7 @@ class ShowIP:
             self.ss_top.destroy()
             self.ss_top = None
             self.ss_brand = None
+            self.ss_slogan = None
             self.ss_info = None
 
     def _ss_tick(self):
@@ -778,6 +785,7 @@ class ShowIP:
             if self.ss_phase == 0:
                 now = datetime.datetime.now().strftime("%d.%m.%Y  %H:%M")
                 self.ss_brand.config(text="SMARTBOXX")
+                self.ss_slogan.config(text="")
                 self.ss_info.config(text=now)
                 self.ss_timer += 1
                 if self.ss_timer >= 15:
@@ -786,9 +794,19 @@ class ShowIP:
                     self.ss_brand.config(text="")
                     self.ss_info.config(text="")
             elif self.ss_phase == 1:
+                self.ss_brand.config(text="SMARTBOXX")
+                self.ss_slogan.config(text="..Database in your pocket!")
+                self.ss_info.config(text="")
                 self.ss_timer += 1
                 if self.ss_timer >= 15:
                     self.ss_phase = 2
+                    self.ss_timer = 0
+                    self.ss_brand.config(text="")
+                    self.ss_slogan.config(text="")
+            elif self.ss_phase == 2:
+                self.ss_timer += 1
+                if self.ss_timer >= 15:
+                    self.ss_phase = 3
                     self.ss_timer = 0
                     try:
                         with open("/proc/uptime") as f:
@@ -800,29 +818,51 @@ class ShowIP:
                         u = ""
                     self.ss_brand.config(text="SMARTBOXX")
                     self.ss_info.config(text=f"System uptime {u}")
-            elif self.ss_phase == 2:
-                self.ss_timer += 1
-                if self.ss_timer >= 15:
-                    self.ss_phase = 3
-                    self.ss_timer = 0
-                    self.ss_brand.config(text="")
-                    self.ss_info.config(text="")
             elif self.ss_phase == 3:
+                self.ss_slogan.config(text="")
                 self.ss_timer += 1
                 if self.ss_timer >= 15:
                     self.ss_phase = 4
                     self.ss_timer = 0
-                    t = self.get_cpu_temp()
-                    self.ss_brand.config(text="SMARTBOXX")
-                    self.ss_info.config(text=f"CPU Temp {t}")
+                    self.ss_brand.config(text="")
+                    self.ss_info.config(text="")
             elif self.ss_phase == 4:
+                self.ss_brand.config(text="SMARTBOXX")
+                self.ss_slogan.config(text="..Database in your pocket!")
+                self.ss_info.config(text="")
                 self.ss_timer += 1
                 if self.ss_timer >= 15:
                     self.ss_phase = 5
                     self.ss_timer = 0
                     self.ss_brand.config(text="")
-                    self.ss_info.config(text="")
+                    self.ss_slogan.config(text="")
             elif self.ss_phase == 5:
+                self.ss_timer += 1
+                if self.ss_timer >= 15:
+                    self.ss_phase = 6
+                    self.ss_timer = 0
+                    t = self.get_cpu_temp()
+                    self.ss_brand.config(text="SMARTBOXX")
+                    self.ss_info.config(text=f"CPU Temp {t}")
+            elif self.ss_phase == 6:
+                self.ss_slogan.config(text="")
+                self.ss_timer += 1
+                if self.ss_timer >= 15:
+                    self.ss_phase = 7
+                    self.ss_timer = 0
+                    self.ss_brand.config(text="")
+                    self.ss_info.config(text="")
+            elif self.ss_phase == 7:
+                self.ss_brand.config(text="SMARTBOXX")
+                self.ss_slogan.config(text="..Database in your pocket!")
+                self.ss_info.config(text="")
+                self.ss_timer += 1
+                if self.ss_timer >= 15:
+                    self.ss_phase = 8
+                    self.ss_timer = 0
+                    self.ss_brand.config(text="")
+                    self.ss_slogan.config(text="")
+            elif self.ss_phase == 8:
                 self.ss_timer += 1
                 if self.ss_timer >= 15:
                     self.ss_phase = 0
