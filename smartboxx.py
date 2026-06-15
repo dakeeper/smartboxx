@@ -684,7 +684,7 @@ class ShowIP:
             fg="#00cc66", bg="black",
         )
         self.ss_label.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
-        self.ss_cycle("hide")
+        self.ss_cycle("show")
 
     def stop_screensaver(self):
         # Aus der Furcht entspringt der Zorn, aus dem Zorn die Gewalt und aus der Gewalt der Schmerz
@@ -702,11 +702,30 @@ class ShowIP:
         if not self.ss_active:
             return
         if phase == "show":
-            self.ss_label.config(text="SMARTBOXX")
-            self.ss_after_id = self.root.after(30000, self.ss_cycle, "hide")
+            self.ss_label.config(text="SMARTBOXX", font=("Helvetica", 40, "bold"))
+            self.ss_after_id = self.root.after(30000, self.ss_cycle, "show_date")
+        elif phase == "show_date":
+            now = datetime.datetime.now().strftime("%d.%m.%Y\n%H:%M")
+            self.ss_label.config(text=f"DATE\n{now}", font=("Helvetica", 28, "bold"))
+            self.ss_after_id = self.root.after(15000, self.ss_cycle, "show_uptime")
+        elif phase == "show_uptime":
+            try:
+                with open("/proc/uptime") as f:
+                    seconds = float(f.read().split()[0])
+                hours = int(seconds // 3600)
+                minutes = int((seconds % 3600) // 60)
+                uptime_str = f"{hours:02d}:{minutes:02d}"
+            except Exception:
+                uptime_str = ""
+            self.ss_label.config(text=f"UPTIME\n{uptime_str}", font=("Helvetica", 28, "bold"))
+            self.ss_after_id = self.root.after(15000, self.ss_cycle, "show_cpu")
+        elif phase == "show_cpu":
+            temp = self.get_cpu_temp()
+            self.ss_label.config(text=f"CPU Temp\n{temp}", font=("Helvetica", 28, "bold"))
+            self.ss_after_id = self.root.after(15000, self.ss_cycle, "show")
         else:
-            self.ss_label.config(text="")
-            self.ss_after_id = self.root.after(10000, self.ss_cycle, "show")
+            self.ss_label.config(text="", font=("Helvetica", 40, "bold"))
+            self.ss_after_id = self.root.after(1000, self.ss_cycle, "show")
 
     def fetch_ip(self):
         # Aus der Furcht entspringt der Zorn, aus dem Zorn die Gewalt und aus der Gewalt der Schmerz
